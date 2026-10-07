@@ -1,0 +1,6 @@
+# Test and lint tooling (used by CI).
+-r requirements.txt
+pytest>=8.0
+httpx>=0.27
+requests>=2.31
+ruff>=0.6

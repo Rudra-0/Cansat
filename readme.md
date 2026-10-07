@@ -158,7 +158,9 @@ Mission Control Web UI Suite:
 ├── drivers/                    # USB CP210x hardware drivers
 ├── START_MISSION_CONTROL.bat   # 1-Click Windows system launcher
 ├── launch.py                   # System launcher with port manager, auto-reload & browser dispatch
-├── requirements.txt            # Python dependencies
+├── requirements.txt            # Server runtime dependencies (pinned)
+├── requirements-ml.txt         # Training / TinyML / notebook extras
+├── requirements-dev.txt        # Test and lint tooling
 ├── tasks.txt                   # Master team task tracker
 ├── readme.md                   # Comprehensive project documentation
 ├── .gitattributes              # GitHub Linguist language classifications
@@ -236,6 +238,8 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
+
+For model training or notebooks use `pip install -r requirements-ml.txt`; for running the tests use `pip install -r requirements-dev.txt`.
 
 #### Launch Mission Control
 

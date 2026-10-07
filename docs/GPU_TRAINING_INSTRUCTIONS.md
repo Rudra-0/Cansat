@@ -37,7 +37,7 @@ powershell -ExecutionPolicy Bypass -File .\setup_gpu_workstation.ps1
 1. Detects if Python is installed. If missing, silently downloads and installs official Python 3.11 64-bit and refreshes `PATH`.
 2. Creates the local `.venv` virtual environment.
 3. Installs CUDA-accelerated PyTorch (bundling CUDA 12.1 runtime - **no separate NVIDIA SDK download required!**).
-4. Installs `requirements.txt` and `onnx`.
+4. Installs `requirements-ml.txt` (server deps plus ONNX, OpenCV and notebook tooling).
 5. Extracts and verifies the 27,000 EuroSAT images from `data/EuroSAT_RGB.zip`.
 6. Probes the GPU and outputs confirmation that Tensor Cores are active.
 
@@ -52,8 +52,7 @@ python -m venv .venv
 Run the official PyTorch CUDA 12.1 / 12.4 pip installer:
 ```powershell
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
-pip install -r requirements.txt
-pip install onnx
+pip install -r requirements-ml.txt
 ```
 
 ### D. Verify GPU Acceleration (Sanity Check)

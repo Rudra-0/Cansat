@@ -1,0 +1,11 @@
+# Model training, TinyML export, notebooks and the ground camera viewer.
+# On a CUDA workstation install torch/torchvision from the PyTorch index first
+# (see docs/GPU_TRAINING_INSTRUCTIONS.md); pip will then keep that build.
+-r requirements.txt
+torch>=2.2
+torchvision>=0.17
+onnx>=1.16
+onnxruntime>=1.18
+opencv-python>=4.9
+seaborn>=0.13
+metpy>=1.6

@@ -15,7 +15,8 @@
 
 $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
-Set-Location $ScriptDir
+$RepoRoot = Split-Path -Parent $ScriptDir
+Set-Location $RepoRoot
 
 Write-Host "===============================================================================" -ForegroundColor Cyan
 Write-Host "       COGNITIVE CANSAT - AUTOMATED NVIDIA GPU WORKSTATION BOOTSTRAPPER         " -ForegroundColor Cyan
@@ -113,7 +114,7 @@ Write-Host "[OK] Python is available: $pyVersion" -ForegroundColor Green
 # STEP 2: Create Local Virtual Environment (.venv)
 # -----------------------------------------------------------------------------
 Write-Host "`n[2/6] Preparing virtual environment (.venv)..." -ForegroundColor Yellow
-$VenvPath = Join-Path $ScriptDir ".venv"
+$VenvPath = Join-Path $RepoRoot ".venv"
 $VenvPython = Join-Path $VenvPath "Scripts\python.exe"
 $VenvPip = Join-Path $VenvPath "Scripts\pip.exe"
 
@@ -136,16 +137,15 @@ Write-Host "[OK] CUDA PyTorch installation complete." -ForegroundColor Green
 # -----------------------------------------------------------------------------
 # STEP 4: Install Project Dependencies & ONNX
 # -----------------------------------------------------------------------------
-Write-Host "`n[4/6] Installing project dependencies from requirements.txt..." -ForegroundColor Yellow
-& $VenvPip install -r (Join-Path $ScriptDir "requirements.txt")
-& $VenvPip install onnx
+Write-Host "`n[4/6] Installing project dependencies from requirements-ml.txt..." -ForegroundColor Yellow
+& $VenvPip install -r (Join-Path $RepoRoot "requirements-ml.txt")
 Write-Host "[OK] Dependencies installed successfully." -ForegroundColor Green
 
 # -----------------------------------------------------------------------------
 # STEP 5: Extract EuroSAT Aerial Dataset
 # -----------------------------------------------------------------------------
 Write-Host "`n[5/6] Verifying and unpacking EuroSAT aerial dataset..." -ForegroundColor Yellow
-& $VenvPython (Join-Path $ScriptDir "ml\download_dataset.py")
+& $VenvPython (Join-Path $RepoRoot "ml\download_dataset.py")
 Write-Host "[OK] Dataset verified on disk." -ForegroundColor Green
 
 # -----------------------------------------------------------------------------
