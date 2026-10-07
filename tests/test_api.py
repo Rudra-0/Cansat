@@ -111,6 +111,33 @@ class TestApiSmoke(unittest.TestCase):
         self.assertEqual(self.client.get("/hardware/tare").status_code, 200)
         self.assertEqual(self.client.get("/analytics/kinematics").status_code, 200)
 
+    def test_hardware_disabled_mode(self):
+        from unittest import mock
+        from starlette.websockets import WebSocketDisconnect
+        with mock.patch.dict(os.environ, {"CANSAT_HARDWARE": "off"}):
+            self.assertFalse(server.hardware_bridge_enabled())
+            self.assertEqual(self.client.get("/hardware/ports").json(), {"ports": [], "hardware_enabled": False})
+            self.assertEqual(self.client.get("/hardware/config").json()["status"], "disabled")
+            self.assertEqual(self.client.post("/hardware/config", json={}, headers=AUTH).status_code, 409)
+            with self.client.websocket_connect("/ws/serial") as ws:
+                self.assertIn("Serial bridge disabled", ws.receive_text())
+                with self.assertRaises(WebSocketDisconnect) as ctx:
+                    ws.receive_text()
+                self.assertEqual(ctx.exception.code, server.WS_CLOSE_NO_HARDWARE)
+        self.assertIsNone(server.dual_serial_manager)
+
+    def test_hardware_enabled_bridge(self):
+        from unittest import mock
+        with mock.patch.dict(os.environ, {"CANSAT_HARDWARE": "on",
+                                          "CANSAT_TELEMETRY_PORT": "/dev/nonexistent0",
+                                          "CANSAT_VIDEO_PORT": "/dev/nonexistent1"}):
+            self.assertTrue(server.hardware_bridge_enabled())
+            with self.client.websocket_connect("/ws/serial") as ws:
+                self.assertIn("Active dual bridge", ws.receive_text())
+                self.assertTrue(server.dual_serial_manager.is_running)
+        server.dual_serial_manager.stop()
+        server.dual_serial_manager = None
+
     def test_serial_csv_processor(self):
         line = "24.1,1001.5,100.0,1.2,-0.4,0.3,0.02,0.01,1.01,22.57,88.36,55.0,4.05"
         before = len(server.live_telemetry_history)

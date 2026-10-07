@@ -3757,10 +3757,18 @@
           connectDirectWebSerial(9600);
         }, 500);
       };
-      bridgeSocket.onclose = function () {
+      bridgeSocket.onclose = function (event) {
         document.getElementById('connect-btn').innerText = 'CONNECT';
-        setConnectionState(false, 'DISCONNECTED');
         bridgeSocket = null;
+        if (event && event.code === 4404) {
+          // Server has no serial hardware (cloud/Docker host): use the browser's own USB link.
+          setConnectionState(false, 'NO SERVER HARDWARE (FALLING BACK TO USB...)');
+          setTimeout(function () {
+            connectDirectWebSerial(9600);
+          }, 500);
+          return;
+        }
+        setConnectionState(false, 'DISCONNECTED');
       };
     } catch (e) {
       console.warn('Could not connect to Python Serial Bridge. Falling back to direct USB Web Serial...', e);

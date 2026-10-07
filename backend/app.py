@@ -664,7 +664,16 @@ async def websocket_telemetry_endpoint(websocket: WebSocket):
 # --- REAL-TIME DUAL-PORT HARDWARE SERIAL BRIDGE & PYTHON CORE ENGINES ---
 import asyncio
 import threading
-from backend.core.serial_manager import DualSerialManager, list_available_ports
+from backend.core.serial_manager import DualSerialManager, list_available_ports, HAS_SERIAL
+
+# Close code sent on /ws/serial when this host has no serial hardware bridge.
+WS_CLOSE_NO_HARDWARE = 4404
+
+
+def hardware_bridge_enabled() -> bool:
+    """CANSAT_HARDWARE=off disables the server-side serial bridge (cloud / Docker hosts)."""
+    mode = os.environ.get("CANSAT_HARDWARE", "on").strip().lower()
+    return HAS_SERIAL and mode not in ("off", "0", "false", "no")
 from backend.core.kinematics import KinematicsEngine, KinematicState
 from backend.core.atmospheric import AtmosphericEngine, AtmosphericSounding
 
@@ -765,11 +774,15 @@ def _get_loop() -> asyncio.AbstractEventLoop:
 @app.get("/hardware/ports")
 def get_hardware_ports():
     """Enumerate all serial ports on the host system."""
-    return {"ports": list_available_ports()}
+    if not hardware_bridge_enabled():
+        return {"ports": [], "hardware_enabled": False}
+    return {"ports": list_available_ports(), "hardware_enabled": True}
 
 @app.get("/hardware/config")
 def get_hardware_config():
     """Return active serial port and baud rate configuration."""
+    if not hardware_bridge_enabled():
+        return {"status": "disabled", "hardware_enabled": False, "is_running": False, "available_ports": []}
     loop = _get_loop()
     mgr = get_or_create_serial_manager(loop)
     conn_status = mgr.get_connection_status()
@@ -792,6 +805,8 @@ def get_hardware_config():
 @app.post("/hardware/config")
 def set_hardware_config(cfg: HardwareConfigRequest):
     """Reconfigure serial ports and baud rates dynamically at runtime."""
+    if not hardware_bridge_enabled():
+        raise HTTPException(status_code=409, detail="Serial hardware bridge is disabled on this server")
     loop = _get_loop()
     mgr = get_or_create_serial_manager(loop)
     mgr.reconfigure(
@@ -858,6 +873,11 @@ def get_hardware_tare_status():
 @app.websocket("/ws/serial")
 async def websocket_serial_bridge(websocket: WebSocket):
     await websocket.accept()
+    if not hardware_bridge_enabled():
+        reason = "pyserial not installed" if not HAS_SERIAL else "CANSAT_HARDWARE=off"
+        await websocket.send_text(f"# [HARDWARE] Serial bridge disabled on this server ({reason}). Use direct USB Web Serial.")
+        await websocket.close(code=WS_CLOSE_NO_HARDWARE)
+        return
     with subscribers_lock:
         serial_subscribers.append(websocket)
         count = len(serial_subscribers)
