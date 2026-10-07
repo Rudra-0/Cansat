@@ -38,7 +38,7 @@ powershell -ExecutionPolicy Bypass -File .\setup_gpu_workstation.ps1
 2. Creates the local `.venv` virtual environment.
 3. Installs CUDA-accelerated PyTorch (bundling CUDA 12.1 runtime - **no separate NVIDIA SDK download required!**).
 4. Installs `requirements-ml.txt` (server deps plus ONNX, OpenCV and notebook tooling).
-5. Extracts and verifies the 27,000 EuroSAT images from `data/EuroSAT_RGB.zip`.
+5. Downloads (if needed), extracts and verifies the 27,000 EuroSAT images from `data/EuroSAT_RGB.zip`.
 6. Probes the GPU and outputs confirmation that Tensor Cores are active.
 
 ### Option B: Manual Setup (If Python is already installed)
@@ -65,14 +65,14 @@ python -c "import torch; print('CUDA Available:', torch.cuda.is_available(), '| 
 
 ## 3. Step 2: Dataset Verification & Extraction
 
-The 89.9 MB EuroSAT archive [`data/EuroSAT_RGB.zip`](file:///e:/Cansat/data/EuroSAT_RGB.zip) is already present in this repository.
+The 89.9 MB EuroSAT archive `data/EuroSAT_RGB.zip` is no longer stored in git; the loader downloads it once (TLS-verified, SHA-256 checked) and reuses it afterwards.
 
 Execute the dataset loader:
 ```powershell
 python ml/download_dataset.py
 ```
-* It will detect `data/EuroSAT_RGB.zip` on disk.
-* It will extract all 27,000 images into `data/eurosat/2750/` in ~15 seconds without re-downloading anything.
+* It reuses `data/EuroSAT_RGB.zip` if present, otherwise downloads it (add `--insecure` only behind a TLS-intercepting proxy).
+* It extracts all 27,000 images into `data/eurosat/2750/` in ~15 seconds.
 * It verifies all 10 classes and confirms the dataset is ready.
 
 ---

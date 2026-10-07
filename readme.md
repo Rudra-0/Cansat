@@ -124,7 +124,7 @@ Mission Control Web UI Suite:
 │   ├── ground_cam_viewer.py    # Standalone low-latency OpenCV video HUD
 │   └── README.md               # Firmware flashing and protocol documentation
 ├── data/                       # Telemetry datasets and EuroSAT archive
-│   ├── EuroSAT_RGB.zip         # [Tracked] EuroSAT 89.9 MB aerial dataset archive
+│   ├── EuroSAT_RGB.zip         # [Not tracked] EuroSAT 89.9 MB archive, fetched by ml/download_dataset.py
 │   └── README.md               # Dataset documentation
 ├── test_cases/                 # Ten mission profile CSV datasets
 │   ├── 01_nominal_sounding_flight.csv ... 10_ground_pad_static_test.csv

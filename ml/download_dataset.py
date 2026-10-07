@@ -1,5 +1,6 @@
 import os
 import sys
+import hashlib
 import zipfile
 import urllib.request
 import ssl
@@ -8,6 +9,8 @@ import time
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
 EUROSAT_DIR = os.path.join(DATA_DIR, "eurosat")
 ZIP_PATH = os.path.join(DATA_DIR, "EuroSAT_RGB.zip")
+# SHA-256 of the archive the team trained on (formerly committed to the repo).
+EXPECTED_SHA256 = "8ebea626349354c5328b142b96d0430e647051f26efc2dc974c843f25ecf70bd"
 
 # Reliable Hugging Face mirror as primary, DFKI as fallback
 URLS = [
@@ -83,7 +86,15 @@ def verify_dataset(root_dir):
     print(f"Dataset Root Directory: {found_root}")
     return total_images > 20000
 
+def sha256_of(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
 def main():
+    insecure = "--insecure" in sys.argv
     os.makedirs(DATA_DIR, exist_ok=True)
     os.makedirs(EUROSAT_DIR, exist_ok=True)
     
@@ -102,10 +113,12 @@ def main():
         print(f"[FOUND] Existing zip file found ({os.path.getsize(ZIP_PATH)/(1024*1024):.1f} MB). Skipping download.")
         downloaded = True
     else:
-        # Create unverified context to handle local corporate/proxy SSL issues if any
         ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
+        if insecure:
+            # Opt-in only, for TLS-intercepting proxies; the SHA-256 check below still applies.
+            print("[WARNING] --insecure: TLS certificate verification disabled.")
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
         
         for idx, url in enumerate(URLS, 1):
             print(f"\n[CONNECT] Attempting download from Mirror {idx}:")
@@ -125,7 +138,15 @@ def main():
 
     if not downloaded:
         print("[FATAL] All download mirrors failed. Please check network connectivity.")
+        print("        Behind a TLS-intercepting proxy, retry with: python ml/download_dataset.py --insecure")
         sys.exit(1)
+
+    digest = sha256_of(ZIP_PATH)
+    if digest == EXPECTED_SHA256:
+        print("[VERIFY] Archive SHA-256 matches the reference dataset.")
+    else:
+        print(f"[WARNING] Archive SHA-256 {digest} differs from the reference archive the models were")
+        print("          trained on. The mirror may repackage the same images; results may differ slightly.")
 
     print(f"\n[EXTRACT] Unpacking {ZIP_PATH} to {EUROSAT_DIR} ...")
     start_time = time.time()

@@ -10,8 +10,9 @@ __pycache__/
 *.pyd
 *.log
 
-# Extracted heavy dataset directories (27,000 files)
-# The parent archive data/EuroSAT_RGB.zip is tracked for team distribution
+# EuroSAT training dataset (~94 MB archive, 27,000 extracted images).
+# Not tracked: fetch with `python ml/download_dataset.py`.
+data/EuroSAT_RGB.zip
 data/eurosat/
 data/EuroSAT_RGB/
 

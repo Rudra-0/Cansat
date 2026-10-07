@@ -19,6 +19,7 @@ hardware/
 # ==============================================================================
 **/*.csv
 !test_cases/*.csv
+!reports/all_missions_summary.csv
 **/*.parquet
 **/*.h5
 **/*.hdf5
@@ -34,6 +35,19 @@ recordings/
 *.avi
 *.mkv
 *.bag
+
+# Datasets and research material the server never reads (keep image small).
+# Note: .dockerignore patterns are anchored at the build root, so nested
+# matches need a leading **/.
+data/
+analysis/
+docs/
+tests/
+scripts/
+**/*.ipynb
+**/*.zip
+**/__pycache__/
+**/*.py[cod]
 
 # ==============================================================================
 # Local Databases & Runtime States
