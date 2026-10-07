@@ -34,7 +34,7 @@ METRICS_PATH = os.path.join(REPO_ROOT, "ml", "model_metrics.json")
 
 # Add ml folder to sys.path to import TinyLandingNet and spatial utils
 sys.path.insert(0, os.path.join(REPO_ROOT, "ml"))
-from train_tinyml_vision import TinyLandingNet, SLAI_CLASSES, evaluate_3x3_spatial_grid, compute_vari
+from train_tinyml_vision import TinyLandingNet, SLAI_CLASSES, evaluate_3x3_spatial_grid
 
 
 def benchmark_ground_onnx(num_iterations: int = 200) -> dict:

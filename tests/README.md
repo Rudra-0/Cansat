@@ -7,11 +7,22 @@ This directory contains automated unit tests, verification suites, and synthetic
 * **`selftest.ps1`**: Automated PowerShell test suite verifying mission elapsed time formatting, flight state machine phase progression across all 10 profiles, and mathematical bounds (17 assertions).
 * **`selftest.js`**: Node.js offline unit tests verifying packet parsing, kinematics derivation (pitch, roll, vertical speed), and RFC 4180 CSV serialization (27 assertions).
 * **`test_backend_core.py`**: Python unit test suite verifying 1D Kalman state estimation, 6-DOF attitude fusion, atmospheric sounding physics, tare calibration, and ML inference (12 assertions).
+* **`test_api.py`**: FastAPI smoke tests over every REST/WebSocket endpoint, operator-key protection, CORS policy and the hardware-disabled mode (isolated temporary database).
+* **`test_features.py`**: Shared ML feature engineering used by both training and live inference.
+* **`test_frontend_static.py`**: Checks that every inline `on*=` handler in the dashboard is exported on `window`.
 * **`test_firmware_protocol.py`**: Python binary struct packing and ESP-NOW chunk slicing / reassembly verification (4 assertions).
 * **`test_sm.ps1`**: Focused state machine transition verifier for rapid flight phase debugging (10 profiles).
 * **`generate_test_cases.ps1` / `generate_test_cases.js`**: Generators that synthesize the 10 distinct flight profiles stored in `test_cases/`.
 
 ## Running the Tests
+
+CI (`.github/workflows/ci.yml`) runs these on every push and pull request. To run the same checks locally:
+```bash
+pip install -r requirements-dev.txt
+ruff check .
+python -m pytest -q tests
+node tests/selftest.js
+```
 
 ### 1. PowerShell Mission Verification Suite (17 assertions)
 ```powershell

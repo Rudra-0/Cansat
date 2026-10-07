@@ -15,7 +15,6 @@ Hardware-Agnostic Deep Learning Trainer:
 """
 
 import os
-import sys
 import time
 import json
 import random
@@ -191,7 +190,7 @@ def train_model(data_dir: str = None, epochs: int = 30, batch_size: int = 64, le
         torch.backends.cudnn.benchmark = True
     else:
         print("Running in CPU Mode. (CUDA will activate automatically on NVIDIA systems)")
-    print(f"Target Architecture     : TinyLandingNet (Depthwise Separable CNN)")
+    print("Target Architecture     : TinyLandingNet (Depthwise Separable CNN)")
     print(f"Output Tiers            : {len(SLAI_CLASSES)} ({', '.join(SLAI_CLASSES)})")
     print("-" * 70)
 

@@ -6,7 +6,6 @@ Tests SQLite WAL initialization, batch telemetry ingestion, event logging, and P
 import os
 import unittest
 import tempfile
-from pathlib import Path
 
 from backend.core.database import (
     init_db,
@@ -15,7 +14,6 @@ from backend.core.database import (
     insert_telemetry_batch,
     insert_event,
     finalize_mission,
-    generate_and_save_pfr_report,
     get_mission,
     list_missions,
     get_mission_report,

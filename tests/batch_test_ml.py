@@ -65,7 +65,7 @@ def main():
     end_time = time.time()
     total_time = end_time - start_time
 
-    print(f"Batch Test Complete!")
+    print("Batch Test Complete!")
     print(f"Successful predictions: {success_count}/{len(batch_data)}")
     print(f"Total time taken: {total_time:.2f} seconds")
     if success_count > 0:

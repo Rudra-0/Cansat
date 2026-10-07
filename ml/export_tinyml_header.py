@@ -91,15 +91,15 @@ def generate_header():
 
         lines.append("};\n")
 
-    lines.append(f"// Model Statistics")
+    lines.append("// Model Statistics")
     lines.append(f"#define MODEL_PARAM_COUNT {total_params}")
     lines.append(f"#define MODEL_FLASH_BYTES {total_bytes}")
-    lines.append(f"#define INPUT_WIDTH 64")
-    lines.append(f"#define INPUT_HEIGHT 64")
-    lines.append(f"#define NUM_SLAI_CLASSES 4\n")
+    lines.append("#define INPUT_WIDTH 64")
+    lines.append("#define INPUT_HEIGHT 64")
+    lines.append("#define NUM_SLAI_CLASSES 4\n")
     lines.append("#endif // MODEL_DATA_H\n")
 
-    print(f"[3/3] Writing header to firmware directories...")
+    print("[3/3] Writing header to firmware directories...")
     header_content = "\n".join(lines)
 
     for out_path in [FIRMWARE_HEADER, SAVED_HEADER]:
@@ -112,7 +112,7 @@ def generate_header():
     print("-" * 65)
     print(f"Total INT8 Parameters   : {total_params:,}")
     print(f"Total Flash Storage     : {kb_size:.2f} KB (Well within ESP32 4MB limit)")
-    print(f"SRAM Memory Requirement : < 40 KB (Fits effortlessly in internal 520KB SRAM)")
+    print("SRAM Memory Requirement : < 40 KB (Fits effortlessly in internal 520KB SRAM)")
     print("=" * 65)
     print("[SUCCESS] C++ header model_data.h is 100% ready for ESP32-CAM firmware compilation!")
 

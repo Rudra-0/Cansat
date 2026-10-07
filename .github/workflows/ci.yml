@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    name: Lint & tests (Python)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+      - run: pip install -r requirements-dev.txt
+      - run: ruff check .
+      - run: python -m pytest -q tests
+
+  frontend:
+    name: Frontend checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: node tests/selftest.js
+      - run: npm ci
+      - name: Committed Tailwind CSS is up to date
+        run: |
+          npm run build:css
+          git diff --exit-code -- frontend/css/tailwind.css || {
+            echo "::error::frontend/css/tailwind.css is stale; run 'npm run build:css' and commit it."
+            exit 1
+          }
+
+  docker:
+    name: Docker image builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t cansat-ground-station .
+      - name: Server starts and loads models
+        run: |
+          docker run -d --name gs -p 8000:8000 cansat-ground-station
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:8000/api/health && break
+            sleep 2
+          done
+          curl -fsS http://127.0.0.1:8000/api/health | grep -q '"models_loaded":true'
+          curl -fsS -o /dev/null http://127.0.0.1:8000/dashboard.html
+          curl -fsS -o /dev/null http://127.0.0.1:8000/api/analysis/scenarios
+      - if: failure()
+        run: docker logs gs || true

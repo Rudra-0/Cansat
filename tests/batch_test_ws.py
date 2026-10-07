@@ -32,7 +32,7 @@ async def stress_test():
             end_time = time.time()
             total_time = end_time - start_time
             print("WebSocket Stress Test Complete!")
-            print(f"Packets sent: 500")
+            print("Packets sent: 500")
             print(f"Total time taken: {total_time:.2f} seconds")
             print(f"Throughput: {500 / total_time:.1f} packets/second")
 

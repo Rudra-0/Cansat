@@ -7,11 +7,10 @@ Tests:
 """
 
 import unittest
-import math
 import time
-from backend.core.kinematics import AltitudeKalmanFilter, KinematicsEngine, KinematicAlarms
+from backend.core.kinematics import AltitudeKalmanFilter, KinematicsEngine
 from backend.core.atmospheric import AtmosphericEngine
-from backend.core.serial_manager import DualSerialManager, SerialPortConfig, list_available_ports
+from backend.core.serial_manager import DualSerialManager, list_available_ports
 
 
 class TestKinematicsEngine(unittest.TestCase):

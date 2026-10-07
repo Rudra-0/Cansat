@@ -17,7 +17,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingRegressor
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
-from sklearn.metrics import classification_report, accuracy_score, confusion_matrix, mean_squared_error, r2_score
+from sklearn.metrics import classification_report, accuracy_score, mean_squared_error, r2_score
 from pyod.models.iforest import IForest
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

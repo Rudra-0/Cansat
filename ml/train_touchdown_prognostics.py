@@ -27,7 +27,6 @@ import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
-from sklearn.pipeline import Pipeline
 from sklearn.metrics import (
     mean_squared_error, mean_absolute_error, r2_score,
     classification_report, accuracy_score, confusion_matrix

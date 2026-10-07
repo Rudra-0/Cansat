@@ -5,7 +5,6 @@ Author: Rishi Nayak (Data Analytics & Flight Dynamics Lead)
 """
 
 import os
-import sys
 import glob
 import argparse
 import numpy as np

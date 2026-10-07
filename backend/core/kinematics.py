@@ -12,7 +12,7 @@ Features:
 import math
 import time
 from dataclasses import dataclass
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 
 @dataclass
@@ -133,7 +133,7 @@ try:
     import joblib
 except ImportError:
     joblib = None
-from typing import Dict, Any, Optional, Tuple, List
+from typing import Optional, Tuple, List
 
 
 class KinematicsEngine:

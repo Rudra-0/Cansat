@@ -12,7 +12,7 @@ import time
 import threading
 import logging
 from dataclasses import dataclass
-from typing import Callable, List, Optional, Dict, Any
+from typing import Callable, List, Optional, Dict
 
 try:
     import serial
