@@ -91,3 +91,6 @@ cansat_gitdiagram.jpg
 *.drawio
 .DS_Store
 Thumbs.db
+
+node_modules/
+**/node_modules/

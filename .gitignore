@@ -28,3 +28,6 @@ tests/scratch/
 *.sqlite
 *.sqlite3
 *.stl
+
+# Frontend build tooling (CSS output in frontend/css/tailwind.css is committed)
+node_modules/

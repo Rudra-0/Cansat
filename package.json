@@ -1,0 +1,12 @@
+{
+  "name": "cognitive-cansat-frontend",
+  "private": true,
+  "description": "Build tooling for the Mission Control web UI (no runtime Node dependency).",
+  "scripts": {
+    "build:css": "tailwindcss -c tailwind.config.js -i frontend/css/tailwind.input.css -o frontend/css/tailwind.css --minify",
+    "watch:css": "tailwindcss -c tailwind.config.js -i frontend/css/tailwind.input.css -o frontend/css/tailwind.css --watch"
+  },
+  "devDependencies": {
+    "tailwindcss": "3.4.19"
+  }
+}
