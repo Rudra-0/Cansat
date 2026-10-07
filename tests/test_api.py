@@ -145,6 +145,34 @@ class TestApiSmoke(unittest.TestCase):
         self.assertGreaterEqual(len(server.live_telemetry_history), min(before + 1, 20))
         self.assertEqual(self.client.get("/analytics/kinematics").json()["status"], "active")
 
+    def test_malformed_serial_line_is_logged(self):
+        with self.assertLogs("cansat.server", level="WARNING") as logs:
+            server.on_telemetry_csv_processor("24.1,abc,100,1,1,1,0,0,1,22,88,55,4.0")
+        self.assertIn("malformed telemetry line", logs.output[0])
+
+    def test_dead_serial_subscriber_is_dropped(self):
+        import asyncio
+
+        class DeadSocket:
+            async def send_text(self, _):
+                raise RuntimeError("socket closed")
+
+        class LiveSocket:
+            def __init__(self):
+                self.sent = []
+
+            async def send_text(self, line):
+                self.sent.append(line)
+
+        dead, live = DeadSocket(), LiveSocket()
+        server.serial_subscribers[:] = [dead, live]
+        try:
+            asyncio.run(server.broadcast_serial_line("hello"))
+            self.assertEqual(live.sent, ["hello"])
+            self.assertEqual(server.serial_subscribers, [live])
+        finally:
+            server.serial_subscribers.clear()
+
 
 if __name__ == "__main__":
     unittest.main()

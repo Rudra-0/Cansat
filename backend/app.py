@@ -6,6 +6,7 @@ import os
 import math
 import json
 import time
+import logging
 import warnings
 from typing import Dict, Any, Optional, List
 from collections import deque
@@ -27,6 +28,13 @@ from backend.core import database
 # Suppress minor version warnings for clean telemetry logs
 warnings.filterwarnings("ignore", category=UserWarning)
 
+# No-op when uvicorn (or another host) has already configured the root logger.
+logging.basicConfig(
+    level=os.environ.get("CANSAT_LOG_LEVEL", "INFO").upper(),
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+logger = logging.getLogger("cansat.server")
+
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODELS_DIR = os.path.join(BASE_DIR, "ml", "saved_models")
 METRICS_PATH = os.path.join(BASE_DIR, "ml", "model_metrics.json")
@@ -34,9 +42,9 @@ METRICS_PATH = os.path.join(BASE_DIR, "ml", "model_metrics.json")
 # Initialize persistent SQLite telemetry & mission database
 try:
     database.init_db()
-    print("[Database] SQLite telemetry & mission database initialized in WAL mode.")
+    logger.info("SQLite telemetry & mission database initialized in WAL mode.")
 except Exception as db_err:
-    print(f"[Database] Warning: Could not initialize database: {db_err}")
+    logger.warning("Could not initialize database: %s", db_err)
 
 app = FastAPI(
     title="Cognitive CanSat ML Telemetry Server",
@@ -78,9 +86,9 @@ def load_models():
                 model_metrics = json.load(f)
 
         models_loaded = (phase_classifier is not None and anomaly_detector is not None)
-        print(f"[ML Server] Models successfully loaded. Status: {models_loaded}")
-    except Exception as e:
-        print(f"[ML Server] Error loading models: {e}")
+        logger.info("ML models loaded: %s", models_loaded)
+    except Exception:
+        logger.exception("Error loading ML models")
         models_loaded = False
 
 load_models()
@@ -154,7 +162,14 @@ def run_ml_inference(payload: TelemetryPayload) -> Dict[str, Any]:
         "batteryVoltage": payload.batteryVoltage,
         "vSpd": v_spd
     })
-    print(f"[LIVE AUDIT]: Temp={payload.temp}C, Press={payload.pressure}hPa, Alt={payload.altitude}m, Accel=({payload.ax},{payload.ay},{payload.az})g, Gyro=({payload.gx},{payload.gy},{payload.gz})deg/s, GPS=({payload.lat},{payload.lon}), Hum={payload.humidity}%, Bat={payload.batteryVoltage}V, vSpd={v_spd}m/s", flush=True)
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug(
+            "LIVE AUDIT: Temp=%sC Press=%shPa Alt=%sm Accel=(%s,%s,%s)g Gyro=(%s,%s,%s)deg/s "
+            "GPS=(%s,%s) Hum=%s%% Bat=%sV vSpd=%sm/s",
+            payload.temp, payload.pressure, payload.altitude, payload.ax, payload.ay, payload.az,
+            payload.gx, payload.gy, payload.gz, payload.lat, payload.lon, payload.humidity,
+            payload.batteryVoltage, v_spd,
+        )
     pad_alt = payload.padAlt if (payload.padAlt is not None and payload.padAlt > 0) else payload.altitude
     pad_temp = payload.padTemp if payload.padTemp is not None else payload.temp
     pad_press = payload.padPress if payload.padPress is not None else 1013.25
@@ -235,6 +250,7 @@ def run_ml_inference(payload: TelemetryPayload) -> Dict[str, Any]:
             reg_pred = float(reg_pipeline.predict(input_df)[0])
             predicted_apogee = max(payload.altitude, reg_pred)
         except Exception:
+            logger.warning("Apogee regressor failed; falling back to current altitude", exc_info=True)
             predicted_apogee = payload.altitude
 
     # 4. Thermodynamic Sounding
@@ -647,7 +663,7 @@ def predict_telemetry(payload: TelemetryPayload):
 @app.websocket("/ws/telemetry")
 async def websocket_telemetry_endpoint(websocket: WebSocket):
     await websocket.accept()
-    print("[WebSocket] Client connected to live ML telemetry stream.")
+    logger.info("WebSocket client connected to live ML telemetry stream.")
     try:
         while True:
             data = await websocket.receive_text()
@@ -659,7 +675,7 @@ async def websocket_telemetry_endpoint(websocket: WebSocket):
             except Exception as parse_err:
                 await websocket.send_json({"status": "error", "message": str(parse_err)})
     except WebSocketDisconnect:
-        print("[WebSocket] Client disconnected.")
+        logger.info("WebSocket telemetry client disconnected.")
 
 # --- REAL-TIME DUAL-PORT HARDWARE SERIAL BRIDGE & PYTHON CORE ENGINES ---
 import asyncio
@@ -692,11 +708,18 @@ state_lock = threading.Lock()
 async def broadcast_serial_line(line: str):
     with subscribers_lock:
         targets = list(serial_subscribers)
+    dead = []
     for ws in targets:
         try:
             await ws.send_text(line)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.info("Dropping serial bridge subscriber after failed send: %s", e)
+            dead.append(ws)
+    if dead:
+        with subscribers_lock:
+            for ws in dead:
+                if ws in serial_subscribers:
+                    serial_subscribers.remove(ws)
 
 def on_serial_line_dispatcher(label: str, line: str, loop: asyncio.AbstractEventLoop):
     # Broadcast raw line directly to all active WebSocket clients (index.html HUD)
@@ -731,8 +754,12 @@ def on_telemetry_csv_processor(line: str):
                 "vSpd": kin_state.vertical_speed if kin_state else 0.0,
                 "calibrated_vspd": kin_state.calibrated_vspd if kin_state else 0.0,
             })
+        else:
+            logger.warning("Dropping telemetry line with %d fields (need 13): %.120r", len(parts), line)
+    except ValueError as e:
+        logger.warning("Dropping malformed telemetry line %.120r: %s", line, e)
     except Exception:
-        pass
+        logger.exception("Telemetry processing failed for line %.120r", line)
 
 # Global serial manager instance
 dual_serial_manager: Optional[DualSerialManager] = None
@@ -881,7 +908,7 @@ async def websocket_serial_bridge(websocket: WebSocket):
     with subscribers_lock:
         serial_subscribers.append(websocket)
         count = len(serial_subscribers)
-    print(f"[WebSocket] Serial bridge client connected. (Total subscribers: {count})")
+    logger.info("Serial bridge client connected (total subscribers: %d)", count)
     
     loop = asyncio.get_running_loop()
     manager = get_or_create_serial_manager(loop)
