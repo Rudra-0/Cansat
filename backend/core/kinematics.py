@@ -2,7 +2,7 @@
 Cognitive CanSat - Kinematics & Attitude Estimation Engine
 ----------------------------------------------------------
 Features:
-  - 1D Extended Kalman Filter (EKF) tracking Altitude and Vertical Speed (v_z).
+  - Linear 1D Kalman filter tracking Altitude and Vertical Speed (v_z).
   - 6-DOF IMU Sensor Fusion: Accelerometer gravity pitch/roll + gyroscope integration.
   - Resultant G-Force calculations and peak shock load detection (> 4.5G).
   - Gyro tumble anomaly detection (> 150 deg/s) and freefall tracking.

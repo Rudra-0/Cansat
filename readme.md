@@ -21,15 +21,15 @@ This project combines a browser-based mission control dashboard with a real-time
 ## What it does
 
 - Real-time telemetry dashboard for altitude, pressure, temperature, IMU, battery health, and GPS
-- Dual Baro-Inertial Extended Kalman Filter (1D EKF) fusing vertical acceleration and barometric pressure for sub-meter altitude tracking with zero lag
-- Physics-informed Multi-Output ExtraTrees ML calibrator compensating for Bernoulli aerodynamic pressure drops
+- Linear 1D baro-inertial Kalman filter fusing vertical acceleration and barometric altitude to smooth altitude and estimate vertical speed
+- Physics-informed Multi-Output ExtraTrees ML calibrator compensating for Bernoulli aerodynamic pressure drops (altitude RMSE 0.80 m, vertical-speed RMSE 1.11 m/s on held-out synthetic profiles)
 - 1-Click Stationary TARE & Multi-Sensor Calibration: nulls out static MEMS gyro drift, aligns resting attitude to 0.0°, and zeroes ground pad altitude
-- Super-accurate 7-chart telemetry suite in an ergonomically balanced 3-column grid arrangement with native 1-meter integer/decimeter grids and edge-preserving shock filtering
+- 7-chart telemetry suite in a 3-column grid with 1 m / 0.1 m gridlines and shock-preserving filtering
 - Live anomaly scoring and safety alerts for abnormal flight behavior
 - Flight-phase detection across PAD_IDLE, BALLOON_ASCENT, APOGEE_BURST, PARACHUTE_DESCENT, and TOUCHDOWN_RECOVERY
 - 3D CanSat attitude visualization using Three.js with true spherical radial zoom (`+`, `−`, `RESET`), distance clamping, and complementary sensor fusion, positioned directly alongside the XYZ Gyroscope
 - Cognitive AI Intelligence Hub with 4 transparent model attributions (Random Forest phase classifier, PyOD Isolation Forest anomaly guard, Gradient Boosting Balloon Ascent & Drop Forecast, TinyLandingNet CNN) and plain-English mission summaries
-- Persistent SQLite Flight Database (WAL mode) at `data/cansat_missions.db`: real-time micro-batch telemetry streaming (10 pkts/2.5s), mission recording HUD, retroactive flight archiving, and Post-Flight Review (PFR) regulatory audit persistence
+- Persistent SQLite Flight Database (WAL mode) at `data/cansat_missions.db`: real-time micro-batch telemetry streaming (10 pkts/2.5s), mission recording HUD, retroactive flight archiving, and Post-Flight Review (PFR) audit report persistence
 - Ground Station Database Explorer & Mission Manager (`#dbManagerModal`): inspect database disk footprint and stored packet counts, browse flight sessions, view raw SQLite telemetry in tabular format, execute single or batch mission deletions, export 25-column flight CSVs, and download the raw `.db` file
 - Post-Flight Review (PFR) report generator with automated apogee, descent compliance, and PDF export
 - Automated post-flight telemetry analyzer (`ml/flight_analyzer.py`) with Savitzky-Golay velocity smoothing, peak G-shock transients, sounding profiles, and publication-ready PDF/PNG report generation
@@ -252,6 +252,18 @@ For model training or notebooks use `pip install -r requirements-ml.txt`; for ru
 python launch.py
 ```
 
+#### Configuration (environment variables)
+
+| Variable | Default | Purpose |
+| :-- | :-- | :-- |
+| `CANSAT_API_KEY` | unset | Required (`X-API-Key` header) for deleting missions, downloading the database and changing serial ports. When unset, those endpoints only accept requests from the same machine. **Set this on any deployed server.** |
+| `CANSAT_HARDWARE` | `on` | `off` disables the server-side serial bridge (set in the Docker image); the dashboard then falls back to browser Web Serial. |
+| `CANSAT_TELEMETRY_PORT` / `CANSAT_TELEMETRY_BAUD` | `COM4` / `9600` | LoRa telemetry serial port. |
+| `CANSAT_VIDEO_PORT` / `CANSAT_VIDEO_BAUD` | `COM5` / `460800` | ESP32-CAM receiver serial port. |
+| `CANSAT_CORS_ORIGINS` | unset | Extra comma-separated origins allowed to call the API cross-origin (localhost and `file://` are always allowed). |
+| `CANSAT_DB_PATH` | `data/cansat_missions.db` | SQLite mission database location. |
+| `CANSAT_LOG_LEVEL` | `INFO` | Server log level (`DEBUG` adds a per-packet audit line). |
+
 #### Running backend and frontend independently (optional)
 
 To start only the FastAPI machine learning backend:
@@ -302,13 +314,21 @@ To bind to a custom port or deploy on cloud platforms providing dynamic `$PORT`:
 docker run -e PORT=8080 -p 8080:8080 cansat-ground-station
 ```
 
+On a public deployment (Render, Hugging Face Spaces) set an operator key so mission deletion and database download are protected; the dashboard asks for it once per browser tab:
+
+```bash
+docker run -e CANSAT_API_KEY=change-me -p 8000:8000 cansat-ground-station
+```
+
+The image sets `CANSAT_HARDWARE=off`, since containers have no serial ports; connect hardware from the dashboard via browser Web Serial instead.
+
 ## Atmospheric physics and kinematic formulation
 
 The ground station performs real-time mathematical derivations on incoming telemetry packets:
 
 ### Precision altitude estimation & body-axis decoupling
 
-Atmospheric barometric pressure decreases monotonically with elevation. To prevent human hand tilts (e.g. $15^\circ - 25^\circ$ pitch during manual pickup where $a_z = \cos(\theta) < 1.0\text{G}$) from being falsely interpreted as downward kinematic acceleration, vertical state estimation is decoupled from the unrotated body-axis accelerometer. An adaptive dual-rate state estimator maintains a sub-0.18 m stationarity deadband at rest (locking vertical speed $v_z = 0.00\text{ m/s}$) while rapidly scaling tracking rates ($\alpha = 0.75 - 0.95$) upon physical displacement, guaranteeing that physical elevation ALWAYS causes the altitude chart to climb upwards:
+Atmospheric barometric pressure decreases monotonically with elevation. To prevent human hand tilts (e.g. $15^\circ - 25^\circ$ pitch during manual pickup where $a_z = \cos(\theta) < 1.0\text{G}$) from being falsely interpreted as downward kinematic acceleration, vertical state estimation is decoupled from the unrotated body-axis accelerometer. An adaptive dual-rate state estimator maintains a sub-0.18 m stationarity deadband at rest (locking vertical speed $v_z = 0.00\text{ m/s}$) while rapidly scaling tracking rates ($\alpha = 0.75 - 0.95$) upon physical displacement, so that a real change in elevation moves the altitude chart in the right direction:
 
 $$z_{k} = z_{k-1} + \alpha \cdot (z_{\text{baro}} - z_{k-1})$$
 
@@ -381,7 +401,7 @@ The backend exposes the following endpoints:
 - `POST /api/db/missions/{id}/finish` — seal flight, calculate KPIs, and persist PFR audit report
 - `GET /api/db/missions` — list all archived flight sessions with packet counts and apogees
 - `GET /api/db/missions/{id}` — retrieve detailed mission metadata
-- `GET /api/db/missions/{id}/report` — retrieve Post-Flight Review (PFR) regulatory audit
+- `GET /api/db/missions/{id}/report` — retrieve the Post-Flight Review (PFR) audit report
 - `GET /api/db/missions/{id}/telemetry` — fetch full historical telemetry records for replay
 - `GET /api/db/missions/{id}/export/csv` — download 25-column mission telemetry as standard CSV
 - `GET /api/db/stats` — database disk footprint, WAL size, and record count metrics
@@ -422,7 +442,7 @@ Example prediction payload:
 
 ## Flight database architecture & relational schema
 
-The Cognitive CanSat system features an embedded SQLite database engine operating in **Write-Ahead Logging (WAL)** mode located at `data/cansat_missions.db`. It provides zero-latency, concurrent flight mission recording, high-throughput micro-batched telemetry ingestion, discrete flight event logging, and automated Post-Flight Review (PFR) regulatory audit persistence.
+The Cognitive CanSat system features an embedded SQLite database engine operating in **Write-Ahead Logging (WAL)** mode located at `data/cansat_missions.db`. It provides concurrent flight mission recording, micro-batched telemetry ingestion, discrete flight event logging, and automated Post-Flight Review (PFR) audit report persistence.
 
 ### Database architecture & data flow
 
@@ -619,7 +639,7 @@ Stores individual sensor readings, derived physical kinematics, sounding metrics
 
 #### 3. Post-flight review audit reports table (`mission_reports`)
 
-Stores regulatory compliance checks, kinematic KPIs, and serialized audit reports generated upon mission completion.
+Stores descent-rate compliance checks, kinematic KPIs, and serialized audit reports generated upon mission completion.
 
 | Column Name                      | SQL Data Type | Constraints & Defaults                                    | Description                                                                |
 | :------------------------------- | :------------ | :-------------------------------------------------------- | :------------------------------------------------------------------------- |
@@ -632,7 +652,7 @@ Stores regulatory compliance checks, kinematic KPIs, and serialized audit report
 | `max_ejection_shock_g`           | `REAL`        | `NOT NULL`                                                | Peak pyrotechnic/ejection transient acceleration shock ($G$)               |
 | `terminal_descent_rate_mps`      | `REAL`        | `NOT NULL`                                                | Stable terminal descent rate under parachute ($m/s$)                       |
 | `average_descent_rate_mps`       | `REAL`        | `NOT NULL`                                                | Mean vertical descent speed throughout parachute phase ($m/s$)             |
-| `descent_compliance`             | `TEXT`        | `NOT NULL`                                                | Regulatory status: `COMPLIANT (6-11 m/s)` or `NON-COMPLIANT`               |
+| `descent_compliance`             | `TEXT`        | `NOT NULL`                                                | Descent-rate status: `COMPLIANT (6-11 m/s)` or `NON-COMPLIANT`             |
 | `total_flight_time_s`            | `REAL`        | `NOT NULL`                                                | Total elapsed flight duration from pad to touchdown (seconds)              |
 | `total_packets`                  | `INTEGER`     | `NOT NULL`                                                | Total number of telemetry packets received and stored                      |
 | `packet_loss_pct`                | `REAL`        | `NOT NULL DEFAULT 0.0`                                    | Estimated RF packet drop percentage                                        |
@@ -697,7 +717,9 @@ The Ground Station (`dashboard.html`) embeds an interactive aerospace Database E
 
 ## Machine learning pipeline
 
-The machine learning subsystem in `backend/app.py` and `ml/` processes telemetry vectors in real time:
+The machine learning subsystem in `backend/ml_service.py` and `ml/` processes telemetry vectors in real time.
+
+> All tabular-model metrics below are measured on a held-out split of the 10 **synthetic** flight profiles in `test_cases/` (see `ml/model_metrics.json`), not on recorded flights. Rare phases are weaker than the headline accuracy suggests: the phase classifier scores F1 0.55 on `APOGEE_BURST` (12 test samples). TinyLandingNet metrics are on the EuroSAT test split.
 
 | Model Architecture                     | Task                                                           | Input Vector                                      | Performance Metric                                                                                                  |
 | :------------------------------------- | :------------------------------------------------------------- | :------------------------------------------------ | :------------------------------------------------------------------------------------------------------------------ |

@@ -52,7 +52,7 @@ This directory contains the Python backend services, asynchronous hardware seria
 
 ## Flight Database Architecture & Relational Schema
 
-The SQLite persistence engine operates in **Write-Ahead Logging (WAL)** mode at `data/cansat_missions.db`. It provides lock-free concurrent reads and writes, high-throughput micro-batched telemetry ingestion, discrete operational event logging, automated Post-Flight Review (PFR) regulatory audit reports, and full cascading deletions.
+The SQLite persistence engine operates in **Write-Ahead Logging (WAL)** mode at `data/cansat_missions.db`. Readers do not block the single writer, so the dashboard can browse history while a flight is recording. It provides micro-batched telemetry ingestion, discrete operational event logging, automated Post-Flight Review (PFR) audit reports, and cascading deletions.
 
 ### Concurrency & Engine Guarantees
 - **Write-Ahead Logging (WAL)**: `PRAGMA journal_mode=WAL;` allows read queries (e.g. Ground Station HUD, telemetry charting, PFR browser) to execute concurrently with incoming high-frequency telemetry writes without locking the database.
@@ -187,7 +187,7 @@ erDiagram
   - `idx_telemetry_mission_met ON telemetry_records(mission_id, met_seconds)`
   - `idx_telemetry_timestamp ON telemetry_records(mission_id, timestamp_ms)`
 
-#### 3. `mission_reports` (Post-Flight Review / PFR Regulatory Audits)
+#### 3. `mission_reports` (Post-Flight Review / PFR Audit Reports)
 - `id` (`INTEGER PRIMARY KEY AUTOINCREMENT`): Unique report ID
 - `mission_id` (`TEXT NOT NULL UNIQUE, FK -> missions(id) ON DELETE CASCADE`): 1-to-1 mission link
 - `generated_at` (`TIMESTAMP DEFAULT CURRENT_TIMESTAMP`): Report generation time (UTC)
