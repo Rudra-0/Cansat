@@ -144,7 +144,6 @@ Mission Control Web UI Suite:
 ├── docs/                       # Technical architecture, manuals, logs, team task briefings
 │   ├── architecture_and_ml.txt # Project architecture & mathematical formulations
 │   ├── project_log.txt         # Chronological development and mission log
-│   ├── whatsapp_messages.txt   # Formatted team task briefings (Maneet, Rishi, Shubham, Ganesh)
 │   ├── GPU_TRAINING_INSTRUCTIONS.md # NVIDIA GPU workstation setup & training guide
 │   ├── python-ml_focused.text  # Python & ML transformation master roadmap
 │   └── README.md               # Documentation index

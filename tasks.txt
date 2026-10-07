@@ -11,10 +11,10 @@ Edge TinyML safe landing zone classification, and aerospace ground station HUD.
 
 TEAM ROLES & RESPONSIBILITIES:
   - Maneet Bhuyan (@Maneet-Bhuyan) : Hardware, Avionics, Power, Antennas & Airframe (Repo Admin)
-  - Rishi (@Rishe17 - gurbashishsenanayak17@gmail.com) : Telemetry Analytics, Kinematics & Sounding
-  - Shubham (@shxbhxm7 - 837shubham461@gmail.com)       : Web Development, WebSockets & Batch Testing
-  - Ganesh (@ganeshvallabhm - ganeshvallabhm7@gmail.com) : Documentation, Architecture & Research Paper
-  - ALL 4                                               : Common ML Track (TinyLandingNet TinyML Pipeline)
+  - Rishi (@Rishe17) : Telemetry Analytics, Kinematics & Sounding
+  - Shubham (@shxbhxm7) : Web Development, WebSockets & Batch Testing
+  - Ganesh (@ganeshvallabhm) : Documentation, Architecture & Research Paper
+  - ALL 4 : Common ML Track (TinyLandingNet TinyML Pipeline)
 
 ================================================================================
 1. MANEET — PHYSICAL HARDWARE, AVIONICS, MODULES & POWER
