@@ -23,7 +23,7 @@ from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from backend.core import database
+from backend.core import database, features
 
 # Suppress minor version warnings for clean telemetry logs
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -140,10 +140,7 @@ def run_ml_inference(payload: TelemetryPayload) -> Dict[str, Any]:
     if not models_loaded:
         raise HTTPException(status_code=503, detail="Machine Learning models not loaded")
 
-    # Feature extraction
     v_spd = payload.vSpd if payload.vSpd is not None else 0.0
-    accel_mag = math.sqrt(payload.ax**2 + payload.ay**2 + payload.az**2)
-    gyro_mag = math.sqrt(payload.gx**2 + payload.gy**2 + payload.gz**2)
 
     live_telemetry_history.append({
         "time": time.time(),
@@ -170,41 +167,19 @@ def run_ml_inference(payload: TelemetryPayload) -> Dict[str, Any]:
             payload.gx, payload.gy, payload.gz, payload.lat, payload.lon, payload.humidity,
             payload.batteryVoltage, v_spd,
         )
-    pad_alt = payload.padAlt if (payload.padAlt is not None and payload.padAlt > 0) else payload.altitude
-    pad_temp = payload.padTemp if payload.padTemp is not None else payload.temp
-    pad_press = payload.padPress if payload.padPress is not None else 1013.25
-
-    d_alt = payload.altitude - pad_alt
-    d_temp = payload.temp - pad_temp
-    d_press = payload.pressure - pad_press
-
-    # Normalize altitude & battery for model features (trained on 1S LiPo and relative sounding heights)
-    ml_alt = max(0.0, d_alt) if abs(d_alt) < 2500.0 else payload.altitude
-    ml_battery = min(4.20, max(3.30, payload.batteryVoltage)) if payload.batteryVoltage <= 4.30 else 3.85
-    ml_press = 1013.25 * math.pow(max(0.1, 1.0 - (0.0065 * ml_alt) / 288.15), 5.255)
-
-    feature_dict = {
-        'altitude': [ml_alt],
-        'vSpd': [v_spd],
-        'pressure': [ml_press],
-        'temp': [payload.temp],
-        'humidity': [payload.humidity],
-        'ax': [payload.ax],
-        'ay': [payload.ay],
-        'az': [payload.az],
-        'accelMag': [accel_mag],
-        'gx': [payload.gx],
-        'gy': [payload.gy],
-        'gz': [payload.gz],
-        'gyroMag': [gyro_mag],
-        'batteryVoltage': [ml_battery],
-        'dAlt_pad': [d_alt],
-        'dTemp_pad': [d_temp],
-        'dPress_pad': [d_press]
-    }
-
-    feature_names = phase_classifier['feature_names']
-    input_df = pd.DataFrame(feature_dict)[feature_names]
+    pad_alt, pad_temp, _ = features.resolve_pad_baseline(
+        payload.altitude, payload.temp, payload.padAlt, payload.padTemp, payload.padPress
+    )
+    feature_row = features.build_inference_features(
+        temp=payload.temp, pressure=payload.pressure, altitude=payload.altitude,
+        ax=payload.ax, ay=payload.ay, az=payload.az,
+        gx=payload.gx, gy=payload.gy, gz=payload.gz,
+        humidity=payload.humidity, battery_voltage=payload.batteryVoltage, v_spd=v_spd,
+        pad_alt=payload.padAlt, pad_temp=payload.padTemp, pad_press=payload.padPress,
+    )
+    accel_mag = feature_row['accelMag']
+    gyro_mag = feature_row['gyroMag']
+    input_df = features.to_frame(feature_row, phase_classifier['feature_names'])
 
     # 1. Flight Phase Classifier Prediction (Random Forest)
     pipeline = phase_classifier['pipeline']

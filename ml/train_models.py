@@ -6,6 +6,7 @@ Trains:
 3. Apogee Regressor: Gradient Boosting Regressor
 """
 import os
+import sys
 import json
 import glob
 import numpy as np
@@ -20,6 +21,9 @@ from sklearn.metrics import classification_report, accuracy_score, confusion_mat
 from pyod.models.iforest import IForest
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, BASE_DIR)
+from backend.core.features import FEATURE_COLUMNS, add_derived_columns  # noqa: E402
+
 DATA_DIR = os.path.join(BASE_DIR, "test_cases")
 MODELS_DIR = os.path.join(BASE_DIR, "ml", "saved_models")
 os.makedirs(MODELS_DIR, exist_ok=True)
@@ -42,17 +46,11 @@ def label_flight_profile(df, filename):
     else:
         df['vSpd'] = 0.0
 
-    # Accelerometer and Gyro magnitudes
-    df['accelMag'] = np.sqrt(df['ax']**2 + df['ay']**2 + df['az']**2)
-    df['gyroMag'] = np.sqrt(df['gx']**2 + df['gy']**2 + df['gz']**2)
-    
-    # Pad baseline
+    # Magnitudes and pad-relative deltas (shared with live inference)
     pad_alt = df['altitude'].iloc[0] if n > 0 else 0.0
     pad_temp = df['temp'].iloc[0] if n > 0 else 25.0
     pad_press = df['pressure'].iloc[0] if n > 0 else 1013.25
-    df['dAlt_pad'] = df['altitude'] - pad_alt
-    df['dTemp_pad'] = df['temp'] - pad_temp
-    df['dPress_pad'] = df['pressure'] - pad_press
+    add_derived_columns(df, pad_alt, pad_temp, pad_press)
     
     # Static pad test profile
     if "10_ground_pad_static_test" in filename:
@@ -95,13 +93,7 @@ def label_flight_profile(df, filename):
     return df
 
 def extract_features(df):
-    feature_cols = [
-        'altitude', 'vSpd', 'pressure', 'temp', 'humidity',
-        'ax', 'ay', 'az', 'accelMag',
-        'gx', 'gy', 'gz', 'gyroMag',
-        'batteryVoltage', 'dAlt_pad', 'dTemp_pad', 'dPress_pad'
-    ]
-    return df[feature_cols]
+    return df[FEATURE_COLUMNS]
 
 def main():
     print("=" * 70)
