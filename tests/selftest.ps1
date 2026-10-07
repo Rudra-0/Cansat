@@ -128,7 +128,9 @@ foreach ($tc in $dynamicTestCases) {
 
 # --- 3. HTML INTEGRITY & CLEANUP CHECKS ---
 Write-Host "`n--- 3. Testing HTML Features, Clean Header & Timer Implementation ---" -ForegroundColor Yellow
-$htmlContent = [System.IO.File]::ReadAllText($htmlPath)
+# Markup and the extracted dashboard script are checked together.
+$dashboardJsPath = Join-Path (Join-Path (Join-Path $rootDir "frontend") "js") "dashboard.js"
+$htmlContent = [System.IO.File]::ReadAllText($htmlPath) + [System.IO.File]::ReadAllText($dashboardJsPath)
 
 Assert-Test "Subtitle paragraph REMOVED" (-not $htmlContent.Contains("Sounding Pico-Satellite Bus • Real-Time Atmospheric Characterization &amp; Telemetry"))
 Assert-Test "Live MET timer wiring present" ($htmlContent.Contains("formatMissionTime") -and $htmlContent.Contains("phase-elapsed-time"))

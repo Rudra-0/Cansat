@@ -89,7 +89,10 @@ assert('CSV 17 columns', header.split(',').length === 17);
 
 const fs = require('fs');
 const path = require('path');
-const html = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'dashboard.html'), 'utf8');
+const frontendDir = path.join(__dirname, '..', 'frontend');
+// Markup and the extracted dashboard script are checked together.
+const html = fs.readFileSync(path.join(frontendDir, 'dashboard.html'), 'utf8') +
+  fs.readFileSync(path.join(frontendDir, 'js', 'dashboard.js'), 'utf8');
 
 assert('Web Serial requestPort', html.includes('navigator.serial.requestPort'));
 assert('TextDecoderStream', html.includes('TextDecoderStream'));
