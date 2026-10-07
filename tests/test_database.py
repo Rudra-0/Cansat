@@ -298,13 +298,17 @@ class TestCanSatDatabase(unittest.TestCase):
                 return
 
         if use_client:
+            # Operator endpoints (download/delete) require the API key when one is configured.
+            os.environ.setdefault("CANSAT_API_KEY", "test-key")
+            auth = {"X-API-Key": os.environ["CANSAT_API_KEY"]}
+
             # 1. Stats
             resp = client.get("/api/db/stats")
             self.assertEqual(resp.status_code, 200)
             self.assertIn("stats", resp.json())
 
             # 2. Download
-            resp = client.get("/api/db/download")
+            resp = client.get("/api/db/download", headers=auth)
             self.assertEqual(resp.status_code, 200)
             self.assertIn("application/x-sqlite3", resp.headers["content-type"])
 
@@ -331,7 +335,7 @@ class TestCanSatDatabase(unittest.TestCase):
             self.assertIn("text/csv", csv_resp.headers["content-type"])
             self.assertIn("75.0", csv_resp.text)
 
-            d_resp = client.delete(f"/api/db/missions/{m_id}")
+            d_resp = client.delete(f"/api/db/missions/{m_id}", headers=auth)
             self.assertEqual(d_resp.status_code, 200)
             self.assertTrue(d_resp.json()["deleted"])
         else:

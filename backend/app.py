@@ -3,6 +3,8 @@ Cognitive CanSat FastAPI Real-Time Machine Learning Backend Server
 Serves real-time inference using trained scikit-learn and PyOD models.
 """
 import os
+import re
+import hmac
 import math
 import json
 import time
@@ -17,7 +19,7 @@ import joblib
 import io
 import zipfile
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Depends, Header, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -52,14 +54,45 @@ app = FastAPI(
     version="2.0.0"
 )
 
-# Enable CORS for local file execution and browser dashboard
+# Pages served by this server are same-origin and need no CORS. Cross-origin
+# access is allowed for local development (file:// pages send Origin "null",
+# dev servers on other localhost ports) plus any origins in CANSAT_CORS_ORIGINS.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=[o.strip() for o in os.environ.get("CANSAT_CORS_ORIGINS", "").split(",") if o.strip()],
+    allow_origin_regex=r"^(https?://(localhost|127\.0\.0\.1)(:\d+)?|null)$",
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+LOCAL_CLIENT_HOSTS = {"127.0.0.1", "::1", "localhost"}
+
+
+def require_operator(
+    request: Request,
+    x_api_key: Optional[str] = Header(None),
+    api_key: Optional[str] = Query(None, description="Alternative to the X-API-Key header"),
+) -> None:
+    """Guard for destructive / hardware-control endpoints.
+
+    With CANSAT_API_KEY set, callers must present it (X-API-Key header or
+    ?api_key=). Without it, only clients on this machine are allowed, so a
+    laptop ground station works out of the box while a deployed server is
+    locked down until a key is configured.
+    """
+    expected = os.environ.get("CANSAT_API_KEY")
+    if expected:
+        supplied = x_api_key or api_key or ""
+        if hmac.compare_digest(supplied.encode(), expected.encode()):
+            return
+        raise HTTPException(status_code=401, detail="Valid X-API-Key required",
+                            headers={"WWW-Authenticate": "ApiKey"})
+    client_host = request.client.host if request.client else ""
+    if client_host in LOCAL_CLIENT_HOSTS:
+        return
+    raise HTTPException(status_code=403,
+                        detail="Operator endpoints are restricted to localhost unless CANSAT_API_KEY is set")
 
 # Global model state
 models_loaded = False
@@ -353,13 +386,23 @@ def list_flight_scenarios():
             raise HTTPException(status_code=500, detail=str(e))
     return {"status": "error", "message": "Summary CSV not found"}
 
+TEST_CASES_DIR = os.path.join(BASE_DIR, "test_cases")
+
+
+def available_scenarios() -> set:
+    """Scenario names that may be requested: the CSV files shipped in test_cases/."""
+    if not os.path.isdir(TEST_CASES_DIR):
+        return set()
+    return {f[:-4] for f in os.listdir(TEST_CASES_DIR) if f.endswith(".csv")}
+
+
 @app.get("/api/analysis/scenario/{scenario_name}")
 def get_scenario_telemetry(scenario_name: str):
     """Return time-series telemetry and calculated kinematics for interactive graphing."""
-    clean_name = scenario_name.replace(".csv", "")
-    csv_path = os.path.join(BASE_DIR, "test_cases", f"{clean_name}.csv")
-    if not os.path.exists(csv_path):
+    clean_name = scenario_name.removesuffix(".csv")
+    if clean_name not in available_scenarios():
         raise HTTPException(status_code=404, detail=f"Scenario {clean_name} not found")
+    csv_path = os.path.join(TEST_CASES_DIR, f"{clean_name}.csv")
 
     try:
         df = pd.read_csv(csv_path).bfill().ffill()
@@ -540,7 +583,7 @@ def get_db_mission_telemetry(mission_id: str, limit: Optional[int] = None):
     records = database.get_mission_telemetry(mission_id, limit=limit)
     return {"status": "success", "mission_id": mission_id, "count": len(records), "records": records, "telemetry": records}
 
-@app.delete("/api/db/missions/{mission_id}")
+@app.delete("/api/db/missions/{mission_id}", dependencies=[Depends(require_operator)])
 def delete_db_mission(mission_id: str):
     """Delete a mission and all associated records and reports."""
     deleted = database.delete_mission(mission_id)
@@ -548,7 +591,7 @@ def delete_db_mission(mission_id: str):
         raise HTTPException(status_code=404, detail="Mission not found")
     return {"status": "success", "deleted": True, "deleted_mission_id": mission_id}
 
-@app.delete("/api/db/missions")
+@app.delete("/api/db/missions", dependencies=[Depends(require_operator)])
 def purge_all_db_missions():
     """Purge all recorded flight missions, resetting telemetry, reports, and events."""
     try:
@@ -566,7 +609,7 @@ def get_db_stats():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/db/download")
+@app.get("/api/db/download", dependencies=[Depends(require_operator)])
 def download_sqlite_database():
     """Download the raw SQLite database file (cansat_missions.db) for external analysis."""
     db_path = database.DEFAULT_DB_PATH
@@ -588,7 +631,7 @@ def export_mission_telemetry_csv(mission_id: str):
         content=csv_content,
         media_type="text/csv",
         headers={
-            "Content-Disposition": f"attachment; filename={mission_id}_telemetry.csv"
+            "Content-Disposition": f'attachment; filename="{re.sub(r"[^A-Za-z0-9_.-]", "_", mission_id)}_telemetry.csv"'
         }
     )
 
@@ -804,7 +847,7 @@ def get_hardware_config():
         "available_ports": list_available_ports(),
     }
 
-@app.post("/hardware/config")
+@app.post("/hardware/config", dependencies=[Depends(require_operator)])
 def set_hardware_config(cfg: HardwareConfigRequest):
     """Reconfigure serial ports and baud rates dynamically at runtime."""
     if not hardware_bridge_enabled():

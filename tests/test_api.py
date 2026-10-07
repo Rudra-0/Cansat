@@ -106,6 +106,43 @@ class TestApiSmoke(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(self.client.get(f"/api/db/missions/{mid}").status_code, 404)
 
+    def test_operator_endpoints_require_key(self):
+        for method, path in [("delete", "/api/db/missions"), ("delete", "/api/db/missions/x"),
+                             ("get", "/api/db/download")]:
+            r = getattr(self.client, method)(path)
+            self.assertEqual(r.status_code, 401, path)
+            r = getattr(self.client, method)(path, headers={"X-API-Key": "wrong"})
+            self.assertEqual(r.status_code, 401, path)
+        self.assertEqual(self.client.post("/hardware/config", json={}).status_code, 401)
+        r = self.client.get("/api/db/download", params={"api_key": AUTH["X-API-Key"]})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(self.client.delete("/api/db/missions/nope", headers=AUTH).status_code, 404)
+
+    def test_operator_endpoints_localhost_only_without_key(self):
+        from unittest import mock
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("CANSAT_API_KEY")
+            # TestClient's peer address is "testclient", i.e. not this machine.
+            self.assertEqual(self.client.get("/api/db/download").status_code, 403)
+            local = TestClient(server.app, client=("127.0.0.1", 50000))
+            self.assertEqual(local.get("/api/db/download").status_code, 200)
+
+    def test_cors_policy(self):
+        def preflight(origin):
+            return self.client.options("/api/health", headers={
+                "Origin": origin, "Access-Control-Request-Method": "GET"})
+        for origin in ["http://localhost:5500", "http://127.0.0.1:8000", "null"]:
+            r = preflight(origin)
+            self.assertEqual(r.headers.get("access-control-allow-origin"), origin, origin)
+            self.assertNotIn("access-control-allow-credentials", r.headers)
+        r = preflight("https://evil.example.com")
+        self.assertNotIn("access-control-allow-origin", r.headers)
+
+    def test_scenario_name_validation(self):
+        for bad in ["..%2F..%2Freports%2Fall_missions_summary", "%2E%2E", "README", "01_nominal_sounding_flight.csv.bak"]:
+            self.assertEqual(self.client.get(f"/api/analysis/scenario/{bad}").status_code, 404, bad)
+        self.assertEqual(self.client.get("/api/analysis/scenario/01_nominal_sounding_flight.csv").status_code, 200)
+
     def test_hardware_endpoints(self):
         self.assertEqual(self.client.get("/hardware/ports").status_code, 200)
         self.assertEqual(self.client.get("/hardware/tare").status_code, 200)

@@ -1701,12 +1701,7 @@
     });
 
     try {
-      const host = location.hostname || '127.0.0.1';
-      fetch((location.protocol === 'https:' ? 'https://' : 'http://') + host + ':8000/hardware/tare', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ samples: 15 })
-      }).catch(() => {});
+      fetch(getApiUrl('/hardware/tare?samples=15'), { method: 'POST' }).catch(() => {});
     } catch (e) {}
 
     setTimeout(() => {
@@ -1840,6 +1835,26 @@
     return base + (path.startsWith('/') ? path : '/' + path);
   }
   const ML_SERVER_URL = getApiUrl('');
+
+  // Operator endpoints (delete/purge/download DB) need CANSAT_API_KEY when the server sets one.
+  // The key is asked for once on a 401 and kept for this browser tab only.
+  const OPERATOR_KEY_STORAGE = 'cansat_operator_key';
+  function getOperatorKey() {
+    try { return sessionStorage.getItem(OPERATOR_KEY_STORAGE) || ''; } catch (e) { return ''; }
+  }
+  async function operatorFetch(path, options) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const opts = Object.assign({}, options || {});
+      opts.headers = Object.assign({}, opts.headers || {});
+      const key = getOperatorKey();
+      if (key) opts.headers['X-API-Key'] = key;
+      const resp = await fetch(getApiUrl(path), opts);
+      if (resp.status !== 401 || attempt > 0) return resp;
+      const entered = prompt('This ground station requires an operator API key (CANSAT_API_KEY):');
+      if (!entered) return resp;
+      try { sessionStorage.setItem(OPERATOR_KEY_STORAGE, entered.trim()); } catch (e) {}
+    }
+  }
   let mlServerOnline = false;
   let mlLastPrediction = null;
   let mlInferenceInFlight = false;
@@ -5396,14 +5411,25 @@
     document.body.removeChild(a);
   }
 
-  function downloadDatabaseFile() {
-    const url = getApiUrl('/api/db/download');
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'cansat_missions.db';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+  async function downloadDatabaseFile() {
+    try {
+      const resp = await operatorFetch('/api/db/download');
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.detail || ('HTTP ' + resp.status));
+      }
+      const url = URL.createObjectURL(await resp.blob());
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'cansat_missions.db';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) {
+      console.error('Error downloading database:', e);
+      alert('Could not download database: ' + e.message);
+    }
   }
 
   function openPfrForMission(missionId) {
@@ -5423,7 +5449,7 @@
     }
 
     try {
-      const resp = await fetch(getApiUrl('/api/db/missions/' + missionId), { method: 'DELETE' });
+      const resp = await operatorFetch('/api/db/missions/' + encodeURIComponent(missionId), { method: 'DELETE' });
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));
         throw new Error(err.detail || ('HTTP ' + resp.status));
@@ -5463,7 +5489,7 @@
     }
 
     try {
-      const resp = await fetch(getApiUrl('/api/db/missions'), { method: 'DELETE' });
+      const resp = await operatorFetch('/api/db/missions', { method: 'DELETE' });
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));
         throw new Error(err.detail || ('HTTP ' + resp.status));
