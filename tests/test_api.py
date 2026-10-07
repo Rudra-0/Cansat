@@ -108,6 +108,15 @@ class TestApiSmoke(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(self.client.get(f"/api/db/missions/{mid}").status_code, 404)
 
+    def test_finish_honours_pad_baseline(self):
+        mid = self.client.post("/api/db/missions/start", json={"name": "Pad Test"}).json()["mission_id"]
+        records = [dict(NOMINAL_PACKET, timestamp_ms=i * 500, altitude=100.0 + 10 * i) for i in range(10)]
+        self.client.post("/api/db/missions/telemetry", json={"mission_id": mid, "records": records})
+        default = self.client.post(f"/api/db/missions/{mid}/finish").json()["report"]
+        self.assertAlmostEqual(default["peak_apogee_agl"], 90.0)
+        custom = self.client.post(f"/api/db/missions/{mid}/finish", json={"pad_baseline_alt": 50.0}).json()["report"]
+        self.assertAlmostEqual(custom["peak_apogee_agl"], 140.0)
+
     def test_operator_endpoints_require_key(self):
         for method, path in [("delete", "/api/db/missions"), ("delete", "/api/db/missions/x"),
                              ("get", "/api/db/download")]:

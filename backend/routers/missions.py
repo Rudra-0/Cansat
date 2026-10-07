@@ -80,7 +80,7 @@ def finish_db_mission(mission_id: str, req: Optional[MissionFinishRequest] = Non
     """Finalize a mission, run SQL aggregations, and generate/store the PFR audit report."""
     try:
         pad_alt = req.pad_baseline_alt if req else None
-        report = database.finalize_mission(mission_id)
+        report = database.finalize_mission(mission_id, pad_baseline_alt=pad_alt)
         return {"status": "success", "mission_id": mission_id, "report": report}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

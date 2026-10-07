@@ -563,7 +563,8 @@ Operator: {mission['operator']}
         return report_dict
 
 
-def finalize_mission(mission_id: str, db_path: Optional[str] = None) -> Dict[str, Any]:
+def finalize_mission(mission_id: str, db_path: Optional[str] = None,
+                     pad_baseline_alt: Optional[float] = None) -> Dict[str, Any]:
     """Mark a mission completed and automatically build/save the PFR audit report."""
     init_db(db_path)
     with get_db_connection(db_path) as conn:
@@ -578,7 +579,7 @@ def finalize_mission(mission_id: str, db_path: Optional[str] = None) -> Dict[str
         )
         conn.commit()
 
-    return generate_and_save_pfr_report(mission_id, db_path=db_path)
+    return generate_and_save_pfr_report(mission_id, pad_baseline_alt=pad_baseline_alt, db_path=db_path)
 
 
 def list_missions(db_path: Optional[str] = None) -> List[Dict[str, Any]]:
