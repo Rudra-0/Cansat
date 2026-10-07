@@ -57,7 +57,7 @@ Python Backend Core (backend/core/):
   - database.py: SQLite WAL flight engine (missions, telemetry, PFR audits, events)
                                 |
                                 v
-FastAPI Telemetry & Inference Server (backend/app.py):
+FastAPI Telemetry & Inference Server (backend/app.py + backend/routers/):
   - /ws/serial: Real-time dual-port WebSocket dispatcher to web HUD
   - /analytics/kinematics & /analytics/sounding REST APIs
   - /hardware/ports & /hardware/tare: Serial port manager & gyro tare
@@ -95,11 +95,17 @@ Mission Control Web UI Suite:
 │   │   └── tinyml-demo.js      # Interactive TinyLandingNet inference simulator
 │   └── README.md               # Frontend UI architecture documentation
 ├── backend/                    # FastAPI Python server, WebSocket bridges & kinematics
-│   ├── app.py                  # Telemetry streaming, ML inference & HTML routing
+│   ├── app.py                  # App factory: CORS, routers, static web UI mount
+│   ├── ml_service.py           # Model loading & real-time ML inference
+│   ├── security.py             # Operator API-key / localhost guard
+│   ├── settings.py             # Shared filesystem paths
+│   ├── routers/                # analysis.py, missions.py, ml.py, hardware.py endpoints
 │   ├── standalone_server.ps1   # Native Windows HTTP server (.NET HttpListener)
 │   ├── core/                   # Signal processing & hardware integration
 │   │   ├── serial_manager.py   # DualSerialManager (LoRa @ 9600 & Video @ 460800)
 │   │   ├── kinematics.py       # 1D Kalman Filter & 6-DOF IMU attitude fusion
+│   │   ├── features.py         # Shared ML feature engineering (training + inference)
+│   │   ├── database.py         # SQLite WAL mission database
 │   │   └── atmospheric.py      # Hypsometric altimetry, ELR, Magnus-Tetens, Air Density
 │   └── README.md               # Backend API and WebSocket documentation
 ├── ml/                         # Machine learning training, quantization & benchmarks

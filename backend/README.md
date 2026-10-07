@@ -4,8 +4,8 @@ This directory contains the Python backend services, asynchronous hardware seria
 
 ## Architecture & Components
 
-* **`app.py`**: FastAPI application exposing REST analytics endpoints, full-duplex WebSocket telemetry streams, ML inference pipelines, static report mounts, and web page routers:
-  * **Web Page Routes**:
+* **`app.py`**: FastAPI entry point (`uvicorn backend.app:app`). Configures logging and CORS, includes the routers in `routers/` (`analysis.py`, `missions.py`, `ml.py`, `hardware.py`), and serves `frontend/` as static files. Model loading and inference live in `ml_service.py`; the operator guard for destructive endpoints is in `security.py`.
+  * **Web Pages** (static files from `frontend/`; `/home.html`, `/models` and `/analysis` redirect to the full page names):
     * `GET /` or `GET /index.html`: Mission overview, interactive 3D PLA airframe, and hardware specs.
     * `GET /dashboard.html`: Real-time aerospace telemetry HUD, 3D attitude, and Web Serial bridge.
     * `GET /tinyml.html`: TinyML edge vision deep dive, INT8 quantization benchmarks, and inference simulator.

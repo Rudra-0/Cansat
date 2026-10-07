@@ -1,5 +1,5 @@
 """
-API smoke tests for the FastAPI ground-station server (backend/app.py).
+API smoke tests for the FastAPI ground-station server (backend/app.py + backend/routers/).
 Runs against an isolated temporary SQLite database via FastAPI's TestClient.
 """
 
@@ -14,6 +14,8 @@ os.environ.setdefault("CANSAT_API_KEY", "test-key")
 from fastapi.testclient import TestClient  # noqa: E402
 
 from backend import app as server  # noqa: E402
+from backend import ml_service  # noqa: E402
+from backend.routers import hardware as hw  # noqa: E402
 
 AUTH = {"X-API-Key": os.environ["CANSAT_API_KEY"]}
 
@@ -56,7 +58,7 @@ class TestApiSmoke(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
         body = r.json()
         self.assertEqual(body["status"], "success")
-        self.assertIn(body["predicted_phase"], server.phase_classifier["classes"])
+        self.assertIn(body["predicted_phase"], ml_service.phase_classifier["classes"])
         self.assertGreaterEqual(body["anomaly_score"], 0.0)
         self.assertLessEqual(body["anomaly_score"], 1.0)
 
@@ -152,7 +154,7 @@ class TestApiSmoke(unittest.TestCase):
         from unittest import mock
         from starlette.websockets import WebSocketDisconnect
         with mock.patch.dict(os.environ, {"CANSAT_HARDWARE": "off"}):
-            self.assertFalse(server.hardware_bridge_enabled())
+            self.assertFalse(hw.hardware_bridge_enabled())
             self.assertEqual(self.client.get("/hardware/ports").json(), {"ports": [], "hardware_enabled": False})
             self.assertEqual(self.client.get("/hardware/config").json()["status"], "disabled")
             self.assertEqual(self.client.post("/hardware/config", json={}, headers=AUTH).status_code, 409)
@@ -160,31 +162,31 @@ class TestApiSmoke(unittest.TestCase):
                 self.assertIn("Serial bridge disabled", ws.receive_text())
                 with self.assertRaises(WebSocketDisconnect) as ctx:
                     ws.receive_text()
-                self.assertEqual(ctx.exception.code, server.WS_CLOSE_NO_HARDWARE)
-        self.assertIsNone(server.dual_serial_manager)
+                self.assertEqual(ctx.exception.code, hw.WS_CLOSE_NO_HARDWARE)
+        self.assertIsNone(hw.dual_serial_manager)
 
     def test_hardware_enabled_bridge(self):
         from unittest import mock
         with mock.patch.dict(os.environ, {"CANSAT_HARDWARE": "on",
                                           "CANSAT_TELEMETRY_PORT": "/dev/nonexistent0",
                                           "CANSAT_VIDEO_PORT": "/dev/nonexistent1"}):
-            self.assertTrue(server.hardware_bridge_enabled())
+            self.assertTrue(hw.hardware_bridge_enabled())
             with self.client.websocket_connect("/ws/serial") as ws:
                 self.assertIn("Active dual bridge", ws.receive_text())
-                self.assertTrue(server.dual_serial_manager.is_running)
-        server.dual_serial_manager.stop()
-        server.dual_serial_manager = None
+                self.assertTrue(hw.dual_serial_manager.is_running)
+        hw.dual_serial_manager.stop()
+        hw.dual_serial_manager = None
 
     def test_serial_csv_processor(self):
         line = "24.1,1001.5,100.0,1.2,-0.4,0.3,0.02,0.01,1.01,22.57,88.36,55.0,4.05"
-        before = len(server.live_telemetry_history)
-        server.on_telemetry_csv_processor(line)
-        self.assertGreaterEqual(len(server.live_telemetry_history), min(before + 1, 20))
+        before = len(ml_service.live_telemetry_history)
+        hw.on_telemetry_csv_processor(line)
+        self.assertGreaterEqual(len(ml_service.live_telemetry_history), min(before + 1, 20))
         self.assertEqual(self.client.get("/analytics/kinematics").json()["status"], "active")
 
     def test_malformed_serial_line_is_logged(self):
         with self.assertLogs("cansat.server", level="WARNING") as logs:
-            server.on_telemetry_csv_processor("24.1,abc,100,1,1,1,0,0,1,22,88,55,4.0")
+            hw.on_telemetry_csv_processor("24.1,abc,100,1,1,1,0,0,1,22,88,55,4.0")
         self.assertIn("malformed telemetry line", logs.output[0])
 
     def test_dead_serial_subscriber_is_dropped(self):
@@ -202,13 +204,13 @@ class TestApiSmoke(unittest.TestCase):
                 self.sent.append(line)
 
         dead, live = DeadSocket(), LiveSocket()
-        server.serial_subscribers[:] = [dead, live]
+        hw.serial_subscribers[:] = [dead, live]
         try:
-            asyncio.run(server.broadcast_serial_line("hello"))
+            asyncio.run(hw.broadcast_serial_line("hello"))
             self.assertEqual(live.sent, ["hello"])
-            self.assertEqual(server.serial_subscribers, [live])
+            self.assertEqual(hw.serial_subscribers, [live])
         finally:
-            server.serial_subscribers.clear()
+            hw.serial_subscribers.clear()
 
 
 if __name__ == "__main__":

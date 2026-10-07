@@ -287,7 +287,7 @@ class TestCanSatDatabase(unittest.TestCase):
             use_client = True
         except (ImportError, RuntimeError):
             try:
-                from backend.app import (
+                from backend.routers.missions import (
                     start_db_mission, get_db_stats, ingest_mission_telemetry,
                     export_mission_telemetry_csv, delete_db_mission,
                     MissionStartRequest, TelemetryBatchRequest
